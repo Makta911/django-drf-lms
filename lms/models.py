@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import get_user_model
+from django.conf import settings
 
 User = get_user_model()
 
@@ -20,6 +21,21 @@ class Course(models.Model):
     )
     created_at = models.DateTimeField(_('created at'), auto_now_add=True)
     updated_at = models.DateTimeField(_('updated at'), auto_now=True)
+
+    # ДОБАВЬТЕ ЭТО ПОЛЕ для отслеживания уведомлений
+    last_notification_sent = models.DateTimeField(
+        _('последнее уведомление отправлено'),
+        null=True,
+        blank=True
+    )
+
+    # ДОБАВЬТЕ ПОЛЕ ЦЕНЫ для оплаты
+    price = models.DecimalField(
+        _('цена'),
+        max_digits=10,
+        decimal_places=2,
+        default=0.00
+    )
 
     class Meta:
         verbose_name = _('course')

@@ -1,8 +1,14 @@
 Django==4.2.0
 djangorestframework==3.14.0
-Pillow==9.5.0
+Pillow==9.4.0
 django-filter==23.3
 djangorestframework-simplejwt==5.3.0
 drf-yasg==1.21.7
 stripe==7.14.0
 python-dotenv==1.0.0
+celery==5.3.1
+redis==5.0.1
+django-celery-beat==2.5.0
+django-celery-results==2.5.1
+flower==2.0.1  # Для мониторинга Celery
+django-redis==5.3.0
