@@ -89,3 +89,36 @@ class Subscription(models.Model):
     def __str__(self):
         status = "активна" if self.is_active else "неактивна"
         return f"{self.user.email} -> {self.course.title} ({status})"
+
+
+class StripeProduct(models.Model):
+    """Модель для хранения информации о продуктах в Stripe"""
+    course = models.OneToOneField(
+        Course,
+        on_delete=models.CASCADE,
+        related_name='stripe_product',
+        verbose_name=_('курс')
+    )
+    product_id = models.CharField(
+        _('ID продукта в Stripe'),
+        max_length=100,
+        unique=True
+    )
+    price_id = models.CharField(
+        _('ID цены в Stripe'),
+        max_length=100,
+        unique=True
+    )
+    created_at = models.DateTimeField(_('создан'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('обновлен'), auto_now=True)
+
+    class Meta:
+        verbose_name = _('продукт Stripe')
+        verbose_name_plural = _('продукты Stripe')
+
+    def __str__(self):
+        return f"{self.course.title} - {self.product_id}"
+
+
+class Payment:
+    pass
