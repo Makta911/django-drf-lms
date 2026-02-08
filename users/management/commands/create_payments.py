@@ -1,16 +1,20 @@
 from django.core.management.base import BaseCommand
-from users.models import User, Payment
-from lms.models import Course, Lesson
-from decimal import Decimal
-import random
-from django.utils import timezone
-from datetime import timedelta
-
 
 class Command(BaseCommand):
     help = 'Создание тестовых платежей'
 
     def handle(self, *args, **kwargs):
+        # Импортируем внутри функции чтобы избежать циклического импорта
+        from django.contrib.auth import get_user_model
+        from lms.models import Course, Lesson
+        from users.models import Payment
+        from decimal import Decimal
+        import random
+        from django.utils import timezone
+        from datetime import timedelta
+
+        User = get_user_model()
+
         # Создаем тестовые данные
         users = User.objects.all()
         courses = Course.objects.all()
@@ -40,11 +44,11 @@ class Command(BaseCommand):
             if is_course and courses.exists():
                 course = random.choice(courses)
                 lesson = None
-                amount = Decimal(random.uniform(1000, 5000))
+                amount = Decimal(str(round(random.uniform(1000, 5000), 2)))
             elif lessons.exists():
                 course = None
                 lesson = random.choice(lessons)
-                amount = Decimal(random.uniform(100, 1000))
+                amount = Decimal(str(round(random.uniform(100, 1000), 2)))
             else:
                 continue
 

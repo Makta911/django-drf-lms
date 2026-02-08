@@ -1,8 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.utils.translation import gettext_lazy as _
-from lms.models import Course, Lesson
-
 
 class UserManager(BaseUserManager):
     """Кастомный менеджер для модели User с email в качестве username"""
@@ -46,6 +44,7 @@ class User(AbstractUser):
         return self.email
 
 
+
 class Payment(models.Model):
     """Модель платежа"""
 
@@ -53,15 +52,18 @@ class Payment(models.Model):
         CASH = 'cash', _('Наличные')
         TRANSFER = 'transfer', _('Перевод на счет')
 
+
     user = models.ForeignKey(
-        User,
+        'User',
         on_delete=models.CASCADE,
         related_name='payments',
         verbose_name=_('пользователь')
     )
     payment_date = models.DateTimeField(_('дата оплаты'), auto_now_add=True)
+
+
     course = models.ForeignKey(
-        Course,
+        'lms.Course',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -69,7 +71,7 @@ class Payment(models.Model):
         verbose_name=_('оплаченный курс')
     )
     lesson = models.ForeignKey(
-        Lesson,
+        'lms.Lesson',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
