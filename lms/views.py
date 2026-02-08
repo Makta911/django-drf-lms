@@ -1,12 +1,21 @@
-from rest_framework import viewsets, generics, permissions
+from rest_framework import viewsets, generics, permissions, status
+from rest_framework.response import Response
+from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from .models import Course, Lesson
-from .serializers import CourseSerializer, LessonSerializer
+from .serializers import CourseSerializer, LessonSerializer, SubscriptionSerializer
 from users.permissions import IsOwnerOrModerator, IsModerator, IsOwner
+from .paginators import CoursePagination, LessonPagination, SubscriptionPagination
+
+
 
 
 class CourseViewSet(viewsets.ModelViewSet):
-    """ViewSet для курсов (CRUD) с проверкой прав"""
+    """ViewSet для курсов (CRUD) с проверкой прав и пагинацией"""
+    queryset = Course.objects.all()
+    serializer_class = CourseSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = CoursePagination
     queryset = Course.objects.all()
     serializer_class = CourseSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -63,7 +72,10 @@ class CourseViewSet(viewsets.ModelViewSet):
 
 
 class LessonListCreateView(generics.ListCreateAPIView):
-    """Получение списка уроков и создание нового"""
+    """Получение списка уроков и создание нового с пагинацией"""
+    serializer_class = LessonSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = LessonPagination
     serializer_class = LessonSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -126,3 +138,84 @@ class LessonDestroyView(generics.DestroyAPIView):
             instance.delete()
         else:
             raise PermissionDenied("У вас нет прав для удаления этого урока")
+
+
+class SubscriptionViewSet(viewsets.ModelViewSet):
+    """ViewSet для подписок на курсы"""
+    serializer_class = SubscriptionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = SubscriptionPagination
+
+    def get_queryset(self):
+        """Пользователь видит только свои подписки"""
+        from .models import Subscription  # Импортируем внутри метода
+        return Subscription.objects.filter(user=self.request.user)
+
+    @action(detail=False, methods=['post'])
+    def subscribe(self, request):
+        """Подписаться на курс"""
+        from .models import Subscription, Course  # Импортируем внутри метода
+
+        course_id = request.data.get('course_id')
+
+        if not course_id:
+            return Response(
+                {'error': 'Не указан course_id'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            course = Course.objects.get(id=course_id)
+        except Course.DoesNotExist:
+            return Response(
+                {'error': 'Курс не найден'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Проверяем существующую подписку
+        subscription, created = Subscription.objects.get_or_create(
+            user=request.user,
+            course=course,
+            defaults={'is_active': True}
+        )
+
+        if not created:
+            # Если подписка уже существует, активируем ее
+            subscription.is_active = True
+            subscription.save()
+
+        serializer = self.get_serializer(subscription)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['post'])
+    def unsubscribe(self, request):
+        """Отписаться от курса"""
+        from .models import Subscription  # Импортируем внутри метода
+
+        course_id = request.data.get('course_id')
+
+        if not course_id:
+            return Response(
+                {'error': 'Не указан course_id'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            subscription = Subscription.objects.get(
+                user=request.user,
+                course_id=course_id,
+                is_active=True
+            )
+        except Subscription.DoesNotExist:
+            return Response(
+                {'error': 'Активная подписка не найдена'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        subscription.is_active = False
+        subscription.save()
+
+        return Response(
+            {'message': 'Вы успешно отписались от курса'},
+            status=status.HTTP_200_OK
+        )

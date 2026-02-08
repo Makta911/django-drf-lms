@@ -60,3 +60,32 @@ class Lesson(models.Model):
 
     def __str__(self):
         return f"{self.title} ({self.course.title})"
+
+
+class Subscription(models.Model):
+    """Модель подписки на обновления курса"""
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='subscriptions',
+        verbose_name=_('пользователь')
+    )
+    course = models.ForeignKey(
+        Course,
+        on_delete=models.CASCADE,
+        related_name='subscriptions',
+        verbose_name=_('курс')
+    )
+    is_active = models.BooleanField(_('активна'), default=True)
+    subscribed_at = models.DateTimeField(_('дата подписки'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('дата обновления'), auto_now=True)
+
+    class Meta:
+        verbose_name = _('подписка')
+        verbose_name_plural = _('подписки')
+        unique_together = ['user', 'course']  # Одна подписка на курс для пользователя
+        ordering = ['-subscribed_at']
+
+    def __str__(self):
+        status = "активна" if self.is_active else "неактивна"
+        return f"{self.user.email} -> {self.course.title} ({status})"
