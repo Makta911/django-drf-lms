@@ -89,13 +89,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # DRF настройки
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
-        'rest_framework.permissions.IsAuthenticated',
     ],
 }
 
@@ -143,8 +142,7 @@ SWAGGER_SETTINGS = {
         'Bearer': {
             'type': 'apiKey',
             'name': 'Authorization',
-            'in': 'header',
-            'description': 'JWT токен в формате: Bearer <token>'
+            'in': 'header'
         }
     },
     'USE_SESSION_AUTH': False,
