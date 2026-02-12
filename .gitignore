@@ -1,39 +1,83 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
 # Django
 *.log
+*.pot
+*.pyc
+__pycache__/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
-
-# Media files
 media/
+staticfiles/
+
+# Environment
+.env
+.env.local
+.env.development
+.env.production
+.env.example  # Раскомментируйте, если НЕ хотите хранить шаблон в репозитории
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*.sublime-*
 
 # OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
+*.pyc
 
-# Environment variables
+# Python
+.python-version
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Docker
+.dockerignore
+*.pid
+
+# Tests
+.coverage
+htmlcov/
+.tox/
+.pytest_cache/
+
+# Database dumps
+*.dump
+*.backup
+
+# Logs
+logs/
+*.log
+
+# Static files
+/static/
+/staticfiles/
+
+# Media files
+/media/
+
+# VSCode
+.vscode/
+
+# PyCharm
+.idea/
+
+# Secret files
+*.key
+*.pem
+secrets.json
+
+# Project specific
+# Игнорируем .env, но сохраняем .env.example
 .env
-.env.local
+!.env.example
