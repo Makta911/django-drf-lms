@@ -1,0 +1,204 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop, feature/* ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  PYTHON_VERSION: '3.11'
+  DJANGO_SETTINGS_MODULE: 'config.settings'
+  DB_NAME: 'github_actions_db'
+  DB_USER: 'postgres'
+  DB_PASSWORD: 'postgres'
+  DB_HOST: 'localhost'
+  DB_PORT: '5432'
+  REDIS_HOST: 'localhost'
+  REDIS_PORT: '6379'
+  SECRET_KEY: 'github-actions-test-key-not-for-production'
+  DEBUG: 'True'
+
+jobs:
+  test:
+    name: 🧪 Run Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: ${{ env.DB_NAME }}
+          POSTGRES_USER: ${{ env.DB_USER }}
+          POSTGRES_PASSWORD: ${{ env.DB_PASSWORD }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+
+    - name: 🐍 Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+
+    - name: 📦 Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-django coverage
+
+    - name: 🗄️ Wait for PostgreSQL
+      run: |
+        until pg_isready -h localhost -p 5432; do
+          echo "Waiting for PostgreSQL..."
+          sleep 2
+        done
+
+    - name: 🔧 Create .env file for tests
+      run: |
+        cp .env.example .env
+        echo "SECRET_KEY=${{ env.SECRET_KEY }}" >> .env
+        echo "DEBUG=True" >> .env
+        echo "DB_NAME=${{ env.DB_NAME }}" >> .env
+        echo "DB_USER=${{ env.DB_USER }}" >> .env
+        echo "DB_PASSWORD=${{ env.DB_PASSWORD }}" >> .env
+        echo "DB_HOST=${{ env.DB_HOST }}" >> .env
+        echo "DB_PORT=${{ env.DB_PORT }}" >> .env
+        echo "REDIS_HOST=${{ env.REDIS_HOST }}" >> .env
+        echo "REDIS_PORT=${{ env.REDIS_PORT }}" >> .env
+
+    - name: 🗄️ Run database migrations
+      run: |
+        python manage.py migrate
+
+    - name: 🧪 Run tests with coverage
+      env:
+        STRIPE_API_KEY: ${{ secrets.STRIPE_API_KEY }}
+        STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+        STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+      run: |
+        python manage.py test --noinput
+        coverage run manage.py test
+        coverage report -m
+
+    - name: 📊 Upload coverage report
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: false
+
+  deploy:
+    name: 🚀 Deploy to Production
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: 📦 Install deployment dependencies
+      run: |
+        pip install ansible fabric
+
+    - name: 🔑 Setup SSH key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+        chmod 600 ~/.ssh/deploy_key
+        ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+
+    - name: 📄 Create production .env file
+      run: |
+        cp .env.example .env.production
+        echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> .env.production
+        echo "DEBUG=False" >> .env.production
+        echo "ALLOWED_HOSTS=${{ secrets.SERVER_HOST }},localhost,127.0.0.1" >> .env.production
+        echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env.production
+        echo "DB_USER=${{ secrets.DB_USER }}" >> .env.production
+        echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env.production
+        echo "DB_HOST=${{ secrets.DB_HOST }}" >> .env.production
+        echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env.production
+        echo "REDIS_HOST=${{ secrets.REDIS_HOST }}" >> .env.production
+        echo "REDIS_PORT=${{ secrets.REDIS_PORT }}" >> .env.production
+        echo "REDIS_DB=${{ secrets.REDIS_DB }}" >> .env.production
+        echo "STRIPE_API_KEY=${{ secrets.STRIPE_API_KEY }}" >> .env.production
+        echo "STRIPE_PUBLISHABLE_KEY=${{ secrets.STRIPE_PUBLISHABLE_KEY }}" >> .env.production
+        echo "STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}" >> .env.production
+        echo "FRONTEND_URL=${{ secrets.FRONTEND_URL }}" >> .env.production
+        echo "BACKEND_URL=${{ secrets.BACKEND_URL }}" >> .env.production
+        echo "EMAIL_HOST=${{ secrets.EMAIL_HOST }}" >> .env.production
+        echo "EMAIL_PORT=${{ secrets.EMAIL_PORT }}" >> .env.production
+        echo "EMAIL_USE_TLS=${{ secrets.EMAIL_USE_TLS }}" >> .env.production
+        echo "EMAIL_HOST_USER=${{ secrets.EMAIL_HOST_USER }}" >> .env.production
+        echo "EMAIL_HOST_PASSWORD=${{ secrets.EMAIL_HOST_PASSWORD }}" >> .env.production
+        echo "DEFAULT_FROM_EMAIL=${{ secrets.DEFAULT_FROM_EMAIL }}" >> .env.production
+
+    - name: 🚀 Deploy to server
+      env:
+        SERVER_HOST: ${{ secrets.SERVER_HOST }}
+        SERVER_USER: ${{ secrets.SERVER_USER }}
+        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      run: |
+        chmod +x deploy/deploy.sh
+        ./deploy/deploy.sh
+
+    - name: 💬 Send Telegram notification
+      if: always()
+      uses: appleboy/telegram-action@master
+      with:
+        to: ${{ secrets.TELEGRAM_CHAT_ID }}
+        token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        message: |
+          🚀 Деплой приложения LMS
+          
+          Статус: ${{ job.status }}
+          Ветка: ${{ github.ref_name }}
+          Коммит: ${{ github.sha }}
+          Автор: ${{ github.actor }}
+          
+          ${{ job.status == 'success' && '✅ Деплой успешно завершен!' || '❌ Деплой завершился с ошибкой!' }}
+          
+          Ссылка: https://${{ secrets.SERVER_HOST }}
+
+  notify:
+    name: 📢 Send Notification
+    needs: [test, deploy]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check workflow status
+      run: |
+        if [[ "${{ needs.test.result }}" == "success" && "${{ needs.deploy.result }}" == "success" ]]; then
+          echo "✅ Все этапы успешно выполнены!"
+        elif [[ "${{ needs.test.result }}" == "failure" ]]; then
+          echo "❌ Тесты не пройдены!"
+          exit 1
+        elif [[ "${{ needs.deploy.result }}" == "failure" ]]; then
+          echo "❌ Деплой не удался!"
+          exit 1
+        fi
